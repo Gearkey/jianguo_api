@@ -1,6 +1,7 @@
 import os
 import re
 import urllib.request
+from datetime import datetime
 
 class jianguo_api(object):
     FAILED = -1
@@ -24,6 +25,12 @@ class jianguo_api(object):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36",
             "Referer": "https://www.jianguoyun.com/",
         }
+    
+    def _get(self, url):
+        request = urllib.request.Request(url=url, headers=self._headers)
+        response = urllib.request.urlopen(request)
+
+        return response.read().decode('utf-8')
 
     # 设置单文件大小限制（网页版限制500M）
     def set_max_size(self, max_size=500) -> int:
@@ -31,6 +38,15 @@ class jianguo_api(object):
             return jianguo_api.FAILED
         self._max_size = max_size
         return jianguo_api.SUCCESS
+
+    # 获取账户基本信息
+    def get_user_info(self) -> dict:
+        return self._get(self._host_url + "/d/ajax/userop/getUserInfo")
+    
+    # 获取 snd_magic
+    def get_snd_magic(self) -> str:
+        snd_magic = ""
+        return snd_magic
     
     # 获取用户 Cookie
     def get_cookie(self) -> dict:
@@ -38,10 +54,9 @@ class jianguo_api(object):
 
     # 通过cookie登录
     def login_by_cookie(self, cookie: dict) -> int:
-        self._session.cookies.update(cookie)
-        html = self._get(self._account_url)
-        if not html:
-            return jianguo_api.NETWORK_ERROR
+        self._cookies = cookie
+        self._headers['cookie'] = self._cookies
+        self.get_user_info()
         return jianguo_api.SUCCESS
 
     # 注销
@@ -69,8 +84,11 @@ class jianguo_api(object):
         pass
 
     # 获取文件列表
-    def get_file_list(self, folder_id=-1) -> list:
-        pass
+    def get_file_list(self, snd_id, path, folder_id=-1) -> list:
+        file_list = []
+        resp = self._get(self._host_url + "/d/ajax/browse" + path + "?sndId=" + snd_id + "&sndMagic=" + self.get_snd_magic(snd_id) +"&_=" + datetime.time())
+
+        return file_list
 
     # 获取子文件夹列表
     def get_dir_list(self, folder_id=-1) -> list:
