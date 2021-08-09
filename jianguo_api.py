@@ -77,6 +77,28 @@ class jianguo_api(object):
     def logout(self) -> int:
         pass
 
+    # 新建文件
+    def creat_file(self, snd_id, snd_magic, path, type="txt"):
+        if type == "txt": content_uri = "/static/others/empty.txt"
+        else: content_uri = "/static/others/empty.txt"
+        
+        data = {
+            "path": path,
+            "content_uri": content_uri,
+        }
+
+        self._post(self._host_url + "/d/ajax/fileops/create?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
+        return jianguo_api.SUCCESS
+    
+    # 新建文件夹
+    def creat_dir(self, snd_id, snd_magic, path):
+        data = {
+            "path": path,
+        }
+
+        self._post(self._host_url + "/d/ajax/dirops/create?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
+        return jianguo_api.SUCCESS
+
     # 删除项目
     def delete(self, fid, is_file=True) -> int:
         return jianguo_api.SUCCESS
