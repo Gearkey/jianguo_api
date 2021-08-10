@@ -77,6 +77,13 @@ class jianguo_api(object):
     def logout(self) -> int:
         pass
 
+    # 通过 uuid 判断操作是否成功
+    def is_success_by_uuid(self, path, uuid) -> bool:
+        resp = self._get(self._host_url + path + json.loads(uuid)["uuid"])
+
+        if json.loads(resp)["state"] == "SUCCESS": return True
+        else: return False
+
     # 新建文件
     def creat_file(self, snd_id, snd_magic, path, type="txt"):
         if type == "txt": content_uri = "/static/others/empty.txt"
@@ -133,9 +140,8 @@ class jianguo_api(object):
         
         ## 恢复后返回一个操作的 uuid，通过 uuid 判断操作是否成功
         uuid = self._post(self._host_url + "/d/ajax/restoreDel?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
-        resp = self._get(self._host_url + "/d/ajax/restoreProgress?uuid=" + json.loads(uuid)["uuid"])
 
-        if json.loads(resp)["state"] == "SUCCESS": return jianguo_api.SUCCESS
+        if self.is_success_by_uuid("/d/ajax/restoreProgress?uuid=", uuid): return jianguo_api.SUCCESS
         else: return jianguo_api.FAILED
 
     # 获取文件列表
@@ -163,9 +169,8 @@ class jianguo_api(object):
         
         ## 移动后返回一个操作的 uuid，通过 uuid 判断操作是否成功
         uuid = self._post(self._host_url + move_path + dst_snd_id + "&sndMagic=" + dst_snd_magic, data)
-        resp = self._get(self._host_url + "/d/ajax/moveProgress?uuid=" + json.loads(uuid)["uuid"])
 
-        if json.loads(resp)["state"] == "SUCCESS": return jianguo_api.SUCCESS
+        if self.is_success_by_uuid("/d/ajax/moveProgress?uuid=", uuid): return jianguo_api.SUCCESS
         else: return jianguo_api.FAILED
 
     # 重命名文件
