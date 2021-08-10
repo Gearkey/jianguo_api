@@ -100,32 +100,51 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
 
     # 删除项目
-    def delete(self, fid, is_file=True) -> int:
+    def delete(self, snd_id, snd_magic, path, version, is_dir=False) -> int:
+        data = {
+            path: version,
+        }
+
+        if is_dir: delete_path = "/d/ajax/dirops/delete?sndId="
+        else: delete_path = "/d/ajax/fileops/delete?sndId="
+
+        self._post(self._host_url + delete_path + snd_id + "&sndMagic=" + snd_magic, data)
         return jianguo_api.SUCCESS
 
-    # 从回收站恢复指定项目
-    def clean_rec(self) -> int:
-        pass
-
-    # 获取回收站文件夹列表
-    def get_rec_dir_list(self) -> list:
-        pass
+    # 获取回收站文件列表
+    def get_rec_file_list(self, snd_id, snd_magic, path) -> dict:
+        file_list = self._get(self._host_url + "/d/ajax/listTrashDir" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
+        return json.loads(file_list)
 
     # 彻底删除回收站项目
-    def delete_rec(self, fid, is_file=True) -> int:
-        pass
+    def delete_rec(self, snd_id, snd_magic, path, version) -> int:
+        data = {
+            path: version + " FILE",
+        }
+
+        self._post(self._host_url + "/d/ajax/purge?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
+        return jianguo_api.SUCCESS
 
     # 从回收站恢复文件
-    def recovery(self, fid, is_file=True) -> int:
-        pass
+    def recovery(self, snd_id, snd_magic, path) -> int:
+        data = {
+            path: "",
+        }
+        
+        ## 恢复后返回一个操作的 uuid，通过 uuid 判断操作是否成功
+        uuid = self._post(self._host_url + "/d/ajax/restoreDel?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
+        resp = self._get(self._host_url + "/d/ajax/restoreProgress?uuid=" + json.loads(uuid)["uuid"])
+
+        if json.loads(resp)["state"] == "SUCCESS": return jianguo_api.SUCCESS
+        else: return jianguo_api.FAILED
 
     # 获取文件列表
     def get_file_list(self, snd_id, snd_magic, path) -> dict:
         file_list = self._get(self._host_url + "/d/ajax/browse" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(file_list)
 
-    # 移动文件
-    def move_file(self, snd_id, snd_magic, src_path, dst_dir, dst_snd_id="", dst_snd_magic="") -> int:
+    # 移动/复制文件
+    def move(self, snd_id, snd_magic, src_path, dst_dir, dst_snd_id="", dst_snd_magic="", is_copy=False) -> int:
         data = {
             "srcSndId": snd_id,
             "srcSndMagic": snd_magic,
@@ -138,8 +157,12 @@ class jianguo_api(object):
             dst_snd_id = snd_id
             dst_snd_magic = snd_magic
         
+        ## 如果是复制，需要改变地址
+        if is_copy: move_path = "/d/ajax/submitCopy?sndId="
+        else: move_path = "/d/ajax/submitMove?sndId="
+        
         ## 移动后返回一个操作的 uuid，通过 uuid 判断操作是否成功
-        uuid = self._post(self._host_url + "/d/ajax/submitMove?sndId=" + dst_snd_id + "&sndMagic=" + dst_snd_magic, data)
+        uuid = self._post(self._host_url + move_path + dst_snd_id + "&sndMagic=" + dst_snd_magic, data)
         resp = self._get(self._host_url + "/d/ajax/moveProgress?uuid=" + json.loads(uuid)["uuid"])
 
         if json.loads(resp)["state"] == "SUCCESS": return jianguo_api.SUCCESS
