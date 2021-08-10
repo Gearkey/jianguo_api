@@ -174,7 +174,10 @@ class jianguo_api(object):
         else: return jianguo_api.FAILED
 
     # 重命名文件
-    def rename_file(self, snd_id, snd_magic, path, dest_name, type="file", version="1") -> int:
+    def rename(self, snd_id, snd_magic, path, dest_name, version, is_dir=False) -> int:
+        if is_dir: type = "directory"
+        else: type = "file"
+        
         data = {
             "path": path,
             "type": type,
@@ -183,10 +186,5 @@ class jianguo_api(object):
         }
 
         self._post(self._host_url + "/d/ajax/rename?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
-        return jianguo_api.SUCCESS
-    
-    # 重命名文件夹
-    def rename_dir(self, snd_id, snd_magic, path, dest_name, version="1") -> int:
-        self.rename_file(snd_id, snd_magic, path, dest_name, type="directory", version="1")
         return jianguo_api.SUCCESS
     
