@@ -156,6 +156,17 @@ class jianguo_api(object):
         self._post(self._host_url + "/d/ajax/dirops/create?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
         return jianguo_api.SUCCESS
 
+    # todo：上传文件
+    def upload_file(self, snd_id, snd_magic, path, name) -> dict:
+        dir_name = os.path.split(path)[1]
+        resp = self._post(self._host_url + "/d/ajax/fileops/uploadXHRV2?path=" + path + "&dirName=" + dir_name + "&sndId=" + snd_id + "&sndMagic=" + snd_magic + "&name=" + name, {})
+        return json.loads(resp)
+
+    # todo：上传文件夹
+    def upload_dir(self, snd_id, snd_magic, path) -> int:
+        self.creat_dir(snd_id, snd_magic, path)
+        return jianguo_api.SUCCESS
+
     # 删除项目
     def delete(self, snd_id, snd_magic, path, version, is_dir=False) -> int:
         data = {
@@ -238,3 +249,22 @@ class jianguo_api(object):
         self._post(self._host_url + "/d/ajax/rename?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
         return jianguo_api.SUCCESS
     
+    # 获取文件历史
+    def get_file_version_list(self, snd_id, snd_magic, path) -> dict:
+        version_list = self._get(self._host_url + "/d/ajax/versions" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
+        return json.loads(version_list)
+
+    # 获取文件历史版本下载链接
+    def get_file_version_link(self, snd_id, snd_magic, path, version) -> str:
+        resp = self._get(self._host_url + "/d/ajax/dlink?sndId=" + snd_id + "&sndMagic=" + snd_magic + "&path=" + path + "&ver=" + version)
+        return self._host_url + json.loads(resp)["url"]
+    
+    # 恢复文件历史版本
+    def recovery_file_version(self, snd_id, snd_magic, path, version) -> int:
+        data = {
+            "path": path,
+            "version": version,
+        }
+
+        self._post(self._host_url + "/d/ajax/fileops/restore?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
+        return jianguo_api.SUCCESS
