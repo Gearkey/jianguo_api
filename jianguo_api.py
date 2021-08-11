@@ -83,9 +83,59 @@ class jianguo_api(object):
 
         if json.loads(resp)["state"] == "SUCCESS": return True
         else: return False
+    
+    # 新建同步文件夹
+    def creat_sandbox(self, name, acl_anonymous="0", acl_signed="0", desc="", do_not_sync="false") -> dict:
+        data = {
+            "acl_anonymous": acl_anonymous, ### to_know：是否匿名
+            "acl_signed": acl_signed, ### to_know：是否签名
+            "desc": desc, ### 同步文件夹描述
+            "do_not_sync": do_not_sync, ### 是否不同步到本地
+            "name": name, ### 同步文件夹名称
+        }
+
+        resp = self._post(self._host_url + "/d/ajax/sandbox/create", data)
+        return json.loads(resp)
+    
+    # 删除同步文件夹
+    def delete_sandbox(self, snd_id, snd_magic) -> int:
+        self._post(self._host_url + "/d/ajax/sandbox/delete?sndId=" + snd_id + "&sndMagic=" + snd_magic, {})
+        return jianguo_api.SUCCESS
+    
+    # 获取同步文件夹回收站列表
+    def get_sandbox_rec_list(self) -> dict:
+        file_list = self._get(self._host_url + "/d/ajax/sandbox/listTrash")
+        return json.loads(file_list)
+
+    # 从回收站恢复同步文件夹
+    def recovery_sandbox(self, snd_id, snd_magic) -> int:
+        self._post(self._host_url + "/d/ajax/sandbox/restore?sndId=" + snd_id + "&sndMagic=" + snd_magic, {})
+        return jianguo_api.SUCCESS
+    
+    # 获取同步文件夹信息
+    def get_sandbox_info(self, snd_id, snd_magic, path="/"):
+        sandbox_info = self._get(self._host_url + "/d/ajax/sandbox/metaData?path=" + path + "&sndId=" + snd_id + "&sndMagic=" + snd_magic)
+        return json.loads(sandbox_info)
+    
+    # 修改同步文件夹信息
+    def update_sandbox_info(self, snd_id, snd_magic, name, do_not_sync, desc, acl_path, id, magic, acl_signed, acl_users, acl_groups) -> int:
+        data = {
+            "name": name,
+            "do_not_sync": do_not_sync,
+            "desc": desc,
+            "acl_path": acl_path,
+            "id": id,
+            "magic": magic,
+            "acl_signed": acl_signed,
+            "acl_users": acl_users,
+            "acl_groups": acl_groups,
+        }
+
+        self._post(self._host_url + "/d/ajax/sandbox/updateMetaData?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
+        return jianguo_api.SUCCESS
 
     # 新建文件
-    def creat_file(self, snd_id, snd_magic, path, type="txt"):
+    def creat_file(self, snd_id, snd_magic, path, type="txt") -> int:
         if type == "txt": content_uri = "/static/others/empty.txt"
         else: content_uri = "/static/others/empty.txt"
         
@@ -98,7 +148,7 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
     
     # 新建文件夹
-    def creat_dir(self, snd_id, snd_magic, path):
+    def creat_dir(self, snd_id, snd_magic, path) -> int:
         data = {
             "path": path,
         }
