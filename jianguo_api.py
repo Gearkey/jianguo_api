@@ -233,6 +233,11 @@ class jianguo_api(object):
 
         if self.is_success_by_uuid("/d/ajax/moveProgress?uuid=", uuid): return jianguo_api.SUCCESS
         else: return jianguo_api.FAILED
+    
+    # 获取文件下载链接
+    def get_file_link(self, snd_id, snd_magic, path) -> str:
+        resp = self._get(self._host_url + "/d/ajax/dlink?sndId=" + snd_id + "&sndMagic=" + snd_magic + "&path=" + path)
+        return self._host_url + json.loads(resp)["url"]
 
     # 重命名文件
     def rename(self, snd_id, snd_magic, path, dest_name, version, is_dir=False) -> int:
