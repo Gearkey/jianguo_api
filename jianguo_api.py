@@ -273,3 +273,26 @@ class jianguo_api(object):
 
         self._post(self._host_url + "/d/ajax/fileops/restore?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
         return jianguo_api.SUCCESS
+    
+    # 获取应用密码
+    def get_asps(self) -> dict:
+        resp = self._get(self._host_url + "/d/ajax/userop/getAsps")
+        return json.loads(resp)
+    
+    # 创建应用密码
+    def generate_asp(self, asp_name) -> dict:
+        data = {
+            "asp_name": asp_name,
+        }
+
+        resp = self._post(self._host_url + "/d/ajax/userop/generateAsp", data)
+        return json.loads(resp)
+    
+    # 移除应用密码
+    def revoke_asp(self, asp_name) -> int:
+        data = {
+            "asp_name": asp_name,
+        }
+
+        self._post(self._host_url + "/d/ajax/userop/revokeAsp", data)
+        return jianguo_api.SUCCESS
