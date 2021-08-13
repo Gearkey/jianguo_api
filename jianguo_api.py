@@ -2,6 +2,7 @@ import os
 import re
 import json
 import urllib.request
+import urllib.parse
 from datetime import datetime
 
 class jianguo_api(object):
@@ -18,6 +19,7 @@ class jianguo_api(object):
     NETWORK_ERROR = 9
     CAPTCHA_ERROR = 10
     OFFICIAL_LIMITED = 11
+    DEFAULT_SANDBOX_NAME = "我的坚果云"
 
     def __init__(self):
         self._host_url = "https://www.jianguoyun.com"
@@ -83,6 +85,19 @@ class jianguo_api(object):
             
             if is_match: result.append(sandbox)
         return result
+
+    # 分解 path 为 snd_id、snd_magic 和 path
+    def path_cut(self, path) -> tuple:
+        path_debris = path.split("/")
+        sandbox_name = path_debris[0]
+        if sandbox_name == self.DEFAULT_SANDBOX_NAME: sandbox_name = ""
+
+        path = ""
+        for debri in path_debris[1:]:
+            path += ("/" + debri)
+
+        info = self.get_snd_info_by(name=sandbox_name)[0]
+        return info["sandboxId"], info["magic"], path
     
     # 获取用户 Cookie
     def get_cookie(self) -> dict:
