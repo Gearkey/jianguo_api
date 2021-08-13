@@ -53,13 +53,36 @@ class jianguo_api(object):
 
     # 获取账户基本信息
     def get_user_info(self) -> dict:
-        return self._get(self._host_url + "/d/ajax/userop/getUserInfo")
-    
-    # 获取 snd_magic
-    def get_snd_magic(self) -> str:
-        snd_magic = ""
+        ## fixme：处理后依然是 str
+        resp = json.dumps(self._get(self._host_url + "/d/ajax/userop/getUserInfo"))
+        return json.loads(resp)
 
-        return snd_magic
+    # 根据某键内容获取单个或多个 sandbox 信息
+    def get_snd_info_by(self, name=None, snd_id=None, magic=None, owner=None, permission=None, caps=None, exclusive_user=None, is_default=None, is_owner=None, desc=None, used_space=None) -> list:
+        ## fixme：因为 get_user_info() 返回的是 str，暂时这样处理
+        ## 获取用户信息中 sandbox 部分的内容，断点并且切割
+        sandboxes_str = re.findall(r'"sandboxes":(.*?),"freeUpRate"', self.get_user_info())[0]
+        sandboxes = json.loads(sandboxes_str)
+
+        ## 根据输入条件筛选结果并返回（全部条件匹配）
+        result = []
+        for sandbox in sandboxes:
+            is_match = True
+            
+            if (name != None) & (sandbox["name"] != name): is_match = False ### 名称，【我的坚果云】为空，str
+            if (snd_id != None) & (sandbox["sandboxId"] != snd_id): is_match = False ### id，str
+            if (magic != None) & (sandbox["magic"] != magic): is_match = False ### magic，str
+            if (owner != None) & (sandbox["owner"] != owner): is_match = False ### 所有者，是邮件地址，str
+            if (permission != None) & (sandbox["permission"] != permission): is_match = False ### toknow：权限等级，int
+            if (caps != None) & (sandbox["caps"] != caps): is_match = False ### toknow：int
+            if (exclusive_user != None) & (sandbox["exclusiveUser"] != exclusive_user): is_match = False ### 是否用户专属，一般情况仅【我的坚果云】，bool
+            if (is_default != None) & (sandbox["isDefault"] != is_default): is_match = False ### toknow：是否默认位置，一般情况仅【我的坚果云】，bool
+            if (is_owner != None) & (sandbox["isOwner"] != is_owner): is_match = False ### 是否为所有者，bool
+            if (desc != None) & (sandbox["desc"] != desc): is_match = False ### 描述，默认为空，str
+            if (used_space != None) & (sandbox["usedSpace"] != used_space): is_match = False ### 已用空间，单位 Byte，int
+            
+            if is_match: result.append(sandbox)
+        return result
     
     # 获取用户 Cookie
     def get_cookie(self) -> dict:
