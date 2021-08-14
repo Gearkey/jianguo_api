@@ -247,6 +247,32 @@ class jianguo_api(object):
     def get_file_list(self, snd_id, snd_magic, path) -> dict:
         file_list = self._get(self._host_url + "/d/ajax/browse" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(file_list)
+    
+    # 通过条件获取文件信息
+    def get_file_info(self, path, name=None, rev=None, is_dir=None, is_deleted=None, mtime=None, size=None, tbl_uri=None, aux_info=None) -> list:
+        snd_id, snd_magic, path = self.path_cut(path)
+        
+        ## 如果只传入了 path，则精确定位 name
+        if (name == None) & (name==None) & (rev==None) & (is_dir==None) & (is_deleted==None) & (mtime==None) & (size==None) & (tbl_uri==None) & (aux_info==None):
+            path, name = os.path.split(path)
+        files = self.get_file_list(snd_id, snd_magic, urllib.parse.quote(path))["contents"]
+
+        ## 根据输入条件筛选结果并返回（全部条件匹配）
+        result = []
+        for file in files:
+            is_match = True
+            
+            if (name != None) & (file["name"] != name): is_match = False
+            if (rev != None) & (file["rev"] != rev): is_match = False
+            if (is_dir != None) & (file["isDir"] != is_dir): is_match = False
+            if (is_deleted != None) & (file["isDeleted"] != is_deleted): is_match = False
+            if (mtime != None) & (file["mtime"] != mtime): is_match = False
+            if (size != None) & (file["size"] != size): is_match = False
+            if (tbl_uri != None) & (file["tblUri"] != tbl_uri): is_match = False
+            if (aux_info != None) & (file["auxInfo"] != aux_info): is_match = False
+            
+            if is_match: result.append(file)
+        return result
 
     # 移动/复制文件
     def move(self, snd_id, snd_magic, src_path, dst_dir, dst_snd_id="", dst_snd_magic="", is_copy=False) -> int:
