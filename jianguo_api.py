@@ -360,3 +360,45 @@ class jianguo_api(object):
 
         self._post(self._host_url + "/d/ajax/userop/revokeAsp", data)
         return jianguo_api.SUCCESS
+
+    # 获取书签列表
+    def get_shortcut_list(self) -> dict:
+        snd_id, snd_magic, path = self.path_cut(self.DEFAULT_SANDBOX_NAME + "/书签")
+        return self.get_file_list(snd_id, snd_magic, urllib.parse.quote(path))
+
+    # 创建书签
+    def create_shortcut(self, path) -> dict:
+        snd_id, snd_magic, dest_path = self.path_cut(path)
+        
+        data = {
+            "destPath": dest_path,
+        }
+
+        resp = self._post(self._host_url + "/d/ajax/fileops/createShortcut?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
+        return json.loads(resp)
+    
+    # 获取书签位置
+    def get_shortcut_location(self, name) -> dict:
+        my_nutstore = self.get_snd_info_by(name="", exclusive_user=True, is_default=True, is_owner=True)[0]
+        
+        url = self.get_file_link(my_nutstore["sandboxId"], my_nutstore["magic"], urllib.parse.quote("/书签") + "/" + name + ".nslnk")
+        resp = self._get(url)
+        return json.loads(resp)
+    
+    # 重命名书签
+    def rename_shortcut(self, name, dest_name) -> int:
+        path = self.DEFAULT_SANDBOX_NAME + "/书签/" + name + ".nslnk"
+        version = self.get_file_info(path)[0]["rev"]
+        snd_id, snd_magic, path = self.path_cut(path)
+        
+        self.rename(snd_id, snd_magic, path, dest_name+".nslnk", version)
+        return jianguo_api.SUCCESS
+
+    # 删除书签
+    def delete_shortcut(self, name) -> int:
+        path = self.DEFAULT_SANDBOX_NAME + "/书签/" + name + ".nslnk"
+        version = self.get_file_info(path)[0]["rev"]
+        snd_id, snd_magic, path = self.path_cut(path)
+        
+        self.delete(snd_id, snd_magic, path, version)
+        return jianguo_api.SUCCESS
