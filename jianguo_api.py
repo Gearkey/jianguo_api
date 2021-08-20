@@ -111,9 +111,25 @@ class jianguo_api(object):
 
         return jianguo_api.SUCCESS
 
+    # todo：账号密码登录
+    def login(self, email, password) -> int:
+        data = {
+            "login_email": email,
+            "login_password": password,
+            "remember_me": "on",
+            "login_dest_uri": "/d/home",
+            "custom_ticket": "",
+            "sig": "",
+            "reusable": "false",
+        }
+        self._post(self._host_url + "/d/login", data)
+        return jianguo_api.SUCCESS
+
     # 注销
     def logout(self) -> int:
-        pass
+        self._get(self._host_url + "/logout")
+        self._cookies = None
+        return jianguo_api.SUCCESS
 
     # 通过 uuid 判断操作是否成功
     def is_success_by_uuid(self, path, uuid) -> bool:
