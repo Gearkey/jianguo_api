@@ -20,6 +20,7 @@ class jianguo_api(object):
     CAPTCHA_ERROR = 10
     OFFICIAL_LIMITED = 11
     DEFAULT_SANDBOX_NAME = "我的坚果云"
+    DEFAULT_SHORTCUT_PATH = DEFAULT_SANDBOX_NAME + "/书签"
 
     def __init__(self):
         self._host_url = "https://www.jianguoyun.com"
@@ -60,11 +61,14 @@ class jianguo_api(object):
         return json.loads(resp)
 
     # 根据某键内容获取单个或多个 sandbox 信息
-    def get_snd_info_by(self, name=None, snd_id=None, magic=None, owner=None, permission=None, caps=None, exclusive_user=None, is_default=None, is_owner=None, desc=None, used_space=None) -> list:
-        ## fixme：因为 get_user_info() 返回的是 str，暂时这样处理
-        ## 获取用户信息中 sandbox 部分的内容，断点并且切割
-        sandboxes_str = re.findall(r'"sandboxes":(.*?),"freeUpRate"', self.get_user_info())[0]
-        sandboxes = json.loads(sandboxes_str)
+    def get_snd_info_by(self, name=None, snd_id=None, magic=None, owner=None, permission=None, caps=None, exclusive_user=None, is_default=None, is_owner=None, desc=None, used_space=None, is_deleted=False) -> list:
+        if is_deleted:
+            sandboxes = self.get_sandbox_rec_list()
+        else:
+            ### fixme：因为 get_user_info() 返回的是 str，暂时这样处理
+            ### 获取用户信息中 sandbox 部分的内容，断点并且切割
+            sandboxes_str = re.findall(r'"sandboxes":(.*?),"freeUpRate"', self.get_user_info())[0]
+            sandboxes = json.loads(sandboxes_str)
 
         ## 根据输入条件筛选结果并返回（全部条件匹配）
         result = []
@@ -74,20 +78,21 @@ class jianguo_api(object):
             if (name != None) & (sandbox["name"] != name): is_match = False ### 名称，【我的坚果云】为空，str
             if (snd_id != None) & (sandbox["sandboxId"] != snd_id): is_match = False ### id，str
             if (magic != None) & (sandbox["magic"] != magic): is_match = False ### magic，str
-            if (owner != None) & (sandbox["owner"] != owner): is_match = False ### 所有者，是邮件地址，str
-            if (permission != None) & (sandbox["permission"] != permission): is_match = False ### toknow：权限等级，int
-            if (caps != None) & (sandbox["caps"] != caps): is_match = False ### toknow：int
-            if (exclusive_user != None) & (sandbox["exclusiveUser"] != exclusive_user): is_match = False ### 是否用户专属，一般情况仅【我的坚果云】，bool
-            if (is_default != None) & (sandbox["isDefault"] != is_default): is_match = False ### toknow：是否默认位置，一般情况仅【我的坚果云】，bool
-            if (is_owner != None) & (sandbox["isOwner"] != is_owner): is_match = False ### 是否为所有者，bool
-            if (desc != None) & (sandbox["desc"] != desc): is_match = False ### 描述，默认为空，str
-            if (used_space != None) & (sandbox["usedSpace"] != used_space): is_match = False ### 已用空间，单位 Byte，int
+            if not is_deleted:
+                if (owner != None) & (sandbox["owner"] != owner): is_match = False ### 所有者，是邮件地址，str
+                if (permission != None) & (sandbox["permission"] != permission): is_match = False ### toknow：权限等级，int
+                if (caps != None) & (sandbox["caps"] != caps): is_match = False ### toknow：int
+                if (exclusive_user != None) & (sandbox["exclusiveUser"] != exclusive_user): is_match = False ### 是否用户专属，一般情况仅【我的坚果云】，bool
+                if (is_default != None) & (sandbox["isDefault"] != is_default): is_match = False ### toknow：是否默认位置，一般情况仅【我的坚果云】，bool
+                if (is_owner != None) & (sandbox["isOwner"] != is_owner): is_match = False ### 是否为所有者，bool
+                if (desc != None) & (sandbox["desc"] != desc): is_match = False ### 描述，默认为空，str
+                if (used_space != None) & (sandbox["usedSpace"] != used_space): is_match = False ### 已用空间，单位 Byte，int
             
             if is_match: result.append(sandbox)
         return result
 
     # 分解 path 为 snd_id、snd_magic 和 path
-    def path_cut(self, path) -> tuple:
+    def path_cut(self, path, is_deleted=False) -> tuple:
         path_debris = path.split("/")
         sandbox_name = path_debris[0]
         if sandbox_name == self.DEFAULT_SANDBOX_NAME: sandbox_name = ""
@@ -96,7 +101,7 @@ class jianguo_api(object):
         for debri in path_debris[1:]:
             path += ("/" + debri)
 
-        info = self.get_snd_info_by(name=sandbox_name)[0]
+        info = self.get_snd_info_by(name=sandbox_name, is_deleted=is_deleted)[0]
         return info["sandboxId"], info["magic"], path
     
     # 获取用户 Cookie
@@ -152,29 +157,51 @@ class jianguo_api(object):
         return json.loads(resp)
     
     # 删除同步文件夹
-    def delete_sandbox(self, snd_id, snd_magic) -> int:
+    def delete_sandbox(self, name) -> int:
+        snd_id, snd_magic, path = self.path_cut(name)
+        
         self._post(self._host_url + "/d/ajax/sandbox/delete?sndId=" + snd_id + "&sndMagic=" + snd_magic, {})
         return jianguo_api.SUCCESS
     
     # 获取同步文件夹回收站列表
     def get_sandbox_rec_list(self) -> dict:
         file_list = self._get(self._host_url + "/d/ajax/sandbox/listTrash")
-        return json.loads(file_list)
+        return json.loads(file_list)["sandboxes"]
 
     # 从回收站恢复同步文件夹
-    def recovery_sandbox(self, snd_id, snd_magic) -> int:
+    def recovery_sandbox(self, name) -> int:
+        snd_id, snd_magic, path = self.path_cut(name, is_deleted=True)
+        
         self._post(self._host_url + "/d/ajax/sandbox/restore?sndId=" + snd_id + "&sndMagic=" + snd_magic, {})
         return jianguo_api.SUCCESS
     
     # 获取同步文件夹信息
-    def get_sandbox_info(self, snd_id, snd_magic, path="/"):
+    def get_sandbox_info(self, name) -> dict:
+        snd_id, snd_magic, path = self.path_cut(name)
+        path = "/"
+
         sandbox_info = self._get(self._host_url + "/d/ajax/sandbox/metaData?path=" + path + "&sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(sandbox_info)
     
     # 修改同步文件夹信息
-    def update_sandbox_info(self, snd_id, snd_magic, name, do_not_sync, desc, acl_path, id, magic, acl_signed, acl_users, acl_groups) -> int:
+    def update_sandbox_info(self, name, new_name=None, do_not_sync=None, desc=None, acl_path=None, id=None, magic=None, acl_signed=None, acl_users=None, acl_groups=None) -> int:
+        sandbox = self.get_sandbox_info(name)
+        if sandbox["acls"] == []:
+            sandbox["acls"] = [{"acl": {"anonymous": 0, "signed": 0, "users": {}, "userNicks": {}, "groups": []}, "path": "/"}]
+
+        ## 如果某项为空，填充为已有或默认值
+        if new_name == None: new_name = name ### sandbox 名称，str
+        if do_not_sync == None: do_not_sync = sandbox["doNotSync"] ### 是否同步，str
+        if desc == None: desc = sandbox["desc"] ### 描述，str
+        if acl_path == None: acl_path = sandbox["acls"][0]["path"] ### fixme：权限位置，str
+        if id == None: id = sandbox["id"] ### snd_id，str
+        if magic == None: magic = sandbox["magic"] ### snd_magic，str
+        if acl_signed == None: acl_signed = str(sandbox["acls"][0]["acl"]["signed"]) ### 未知，默认填充
+        if acl_users == None: acl_users = str(sandbox["acls"][0]["acl"]["users"])[1:-1] ### 用户
+        if acl_groups == None: acl_groups = str(sandbox["acls"][0]["acl"]["groups"])[1:-1] ### 用户组
+
         data = {
-            "name": name,
+            "name": new_name,
             "do_not_sync": do_not_sync,
             "desc": desc,
             "acl_path": acl_path,
@@ -185,11 +212,13 @@ class jianguo_api(object):
             "acl_groups": acl_groups,
         }
 
-        self._post(self._host_url + "/d/ajax/sandbox/updateMetaData?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
+        self._post(self._host_url + "/d/ajax/sandbox/updateMetaData?sndId=" + sandbox["id"] + "&sndMagic=" + sandbox["magic"], data)
         return jianguo_api.SUCCESS
 
     # 新建文件
-    def creat_file(self, snd_id, snd_magic, path, type="txt") -> int:
+    def creat_file(self, path, type="txt") -> int:
+        snd_id, snd_magic, path = self.path_cut(path)
+        
         if type == "txt": content_uri = "/static/others/empty.txt"
         else: content_uri = "/static/others/empty.txt"
         
@@ -202,7 +231,9 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
     
     # 新建文件夹
-    def creat_dir(self, snd_id, snd_magic, path) -> int:
+    def creat_dir(self, path) -> int:
+        snd_id, snd_magic, path = self.path_cut(path)
+        
         data = {
             "path": path,
         }
@@ -211,18 +242,23 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
 
     # todo：上传文件
-    def upload_file(self, snd_id, snd_magic, path, name) -> dict:
+    def upload_file(self, path, name) -> dict:
+        snd_id, snd_magic, path = self.path_cut(path)
+        
         dir_name = os.path.split(path)[1]
         resp = self._post(self._host_url + "/d/ajax/fileops/uploadXHRV2?path=" + path + "&dirName=" + dir_name + "&sndId=" + snd_id + "&sndMagic=" + snd_magic + "&name=" + name, {})
         return json.loads(resp)
 
     # todo：上传文件夹
-    def upload_dir(self, snd_id, snd_magic, path) -> int:
-        self.creat_dir(snd_id, snd_magic, path)
+    def upload_dir(self, path) -> int:
+        self.creat_dir(path)
         return jianguo_api.SUCCESS
 
     # 删除项目
-    def delete(self, snd_id, snd_magic, path, version, is_dir=False) -> int:
+    def delete(self, path, is_dir=False) -> int:
+        version = self.get_file_info(path)[0]["rev"]
+        snd_id, snd_magic, path = self.path_cut(path)
+        
         data = {
             path: version,
         }
@@ -234,12 +270,16 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
 
     # 获取回收站文件列表
-    def get_rec_file_list(self, snd_id, snd_magic, path) -> dict:
+    def get_rec_file_list(self, path) -> dict:
+        snd_id, snd_magic, path = self.path_cut(path)
         file_list = self._get(self._host_url + "/d/ajax/listTrashDir" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(file_list)
 
     # 彻底删除回收站项目
-    def delete_rec(self, snd_id, snd_magic, path, version) -> int:
+    # todo：建立获取回收站文件信息函数，自动获取文件版本
+    def delete_rec(self, path, version) -> int:
+        snd_id, snd_magic, path = self.path_cut(path)
+        
         data = {
             path: version + " FILE",
         }
@@ -248,7 +288,9 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
 
     # 从回收站恢复文件
-    def recovery(self, snd_id, snd_magic, path) -> int:
+    def recovery(self, path) -> int:
+        snd_id, snd_magic, path = self.path_cut(path)
+        
         data = {
             path: "",
         }
@@ -260,18 +302,19 @@ class jianguo_api(object):
         else: return jianguo_api.FAILED
 
     # 获取文件列表
-    def get_file_list(self, snd_id, snd_magic, path) -> dict:
+    def get_file_list(self, path) -> dict:
+        snd_id, snd_magic, path = self.path_cut(path)
+        path = urllib.parse.quote(path)
+
         file_list = self._get(self._host_url + "/d/ajax/browse" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(file_list)
     
     # 通过条件获取文件信息
     def get_file_info(self, path, name=None, rev=None, is_dir=None, is_deleted=None, mtime=None, size=None, tbl_uri=None, aux_info=None) -> list:
-        snd_id, snd_magic, path = self.path_cut(path)
-        
         ## 如果只传入了 path，则精确定位 name
         if (name == None) & (name==None) & (rev==None) & (is_dir==None) & (is_deleted==None) & (mtime==None) & (size==None) & (tbl_uri==None) & (aux_info==None):
             path, name = os.path.split(path)
-        files = self.get_file_list(snd_id, snd_magic, urllib.parse.quote(path))["contents"]
+        files = self.get_file_list(path)["contents"]
 
         ## 根据输入条件筛选结果并返回（全部条件匹配）
         result = []
@@ -291,18 +334,17 @@ class jianguo_api(object):
         return result
 
     # 移动/复制文件
-    def move(self, snd_id, snd_magic, src_path, dst_dir, dst_snd_id="", dst_snd_magic="", is_copy=False) -> int:
+    # todo：实现路径到路径的操作，目前是路径到目标目录
+    def move(self, src_path, dst_dir, is_copy=False) -> int:
+        snd_id, snd_magic, src_path = self.path_cut(src_path)
+        dst_snd_id, dst_snd_magic, dst_dir = self.path_cut(dst_dir)
+        
         data = {
             "srcSndId": snd_id,
             "srcSndMagic": snd_magic,
             "srcPath": src_path,
             "dstDir": dst_dir,
         }
-
-        ## 如果没填目标根文件夹的 snd_id 和 snd_magic，即在本根目录内移动
-        if dst_snd_id == "":
-            dst_snd_id = snd_id
-            dst_snd_magic = snd_magic
         
         ## 如果是复制，需要改变地址
         if is_copy: move_path = "/d/ajax/submitCopy?sndId="
@@ -315,12 +357,18 @@ class jianguo_api(object):
         else: return jianguo_api.FAILED
     
     # 获取文件下载链接
-    def get_file_link(self, snd_id, snd_magic, path) -> str:
+    def get_file_link(self, path) -> str:
+        snd_id, snd_magic, path = self.path_cut(path)
+        path = urllib.parse.quote(path)
+
         resp = self._get(self._host_url + "/d/ajax/dlink?sndId=" + snd_id + "&sndMagic=" + snd_magic + "&path=" + path)
         return self._host_url + json.loads(resp)["url"]
 
     # 重命名文件
-    def rename(self, snd_id, snd_magic, path, dest_name, version, is_dir=False) -> int:
+    def rename(self, path, dest_name, is_dir=False) -> int:
+        version = self.get_file_info(path)[0]["rev"]
+        snd_id, snd_magic, path = self.path_cut(path)
+        
         if is_dir: type = "directory"
         else: type = "file"
         
@@ -335,17 +383,23 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
     
     # 获取文件历史
-    def get_file_version_list(self, snd_id, snd_magic, path) -> dict:
+    def get_file_version_list(self, path) -> dict:
+        snd_id, snd_magic, path = self.path_cut(path)
+        
         version_list = self._get(self._host_url + "/d/ajax/versions" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(version_list)
 
     # 获取文件历史版本下载链接
-    def get_file_version_link(self, snd_id, snd_magic, path, version) -> str:
+    def get_file_version_link(self, path, version) -> str:
+        snd_id, snd_magic, path = self.path_cut(path)
+        
         resp = self._get(self._host_url + "/d/ajax/dlink?sndId=" + snd_id + "&sndMagic=" + snd_magic + "&path=" + path + "&ver=" + version)
         return self._host_url + json.loads(resp)["url"]
     
     # 恢复文件历史版本
-    def recovery_file_version(self, snd_id, snd_magic, path, version) -> int:
+    def recovery_file_version(self, path, version) -> int:
+        snd_id, snd_magic, path = self.path_cut(path)
+        
         data = {
             "path": path,
             "version": version,
@@ -379,8 +433,7 @@ class jianguo_api(object):
 
     # 获取书签列表
     def get_shortcut_list(self) -> dict:
-        snd_id, snd_magic, path = self.path_cut(self.DEFAULT_SANDBOX_NAME + "/书签")
-        return self.get_file_list(snd_id, snd_magic, urllib.parse.quote(path))
+        return self.get_file_list(self.DEFAULT_SHORTCUT_PATH)
 
     # 创建书签
     def create_shortcut(self, path) -> dict:
@@ -395,26 +448,19 @@ class jianguo_api(object):
     
     # 获取书签位置
     def get_shortcut_location(self, name) -> dict:
-        my_nutstore = self.get_snd_info_by(name="", exclusive_user=True, is_default=True, is_owner=True)[0]
-        
-        url = self.get_file_link(my_nutstore["sandboxId"], my_nutstore["magic"], urllib.parse.quote("/书签") + "/" + name + ".nslnk")
+        url = self.get_file_link(self.DEFAULT_SHORTCUT_PATH + "/" + name + ".nslnk")
         resp = self._get(url)
         return json.loads(resp)
     
     # 重命名书签
     def rename_shortcut(self, name, dest_name) -> int:
-        path = self.DEFAULT_SANDBOX_NAME + "/书签/" + name + ".nslnk"
-        version = self.get_file_info(path)[0]["rev"]
-        snd_id, snd_magic, path = self.path_cut(path)
+        path = self.DEFAULT_SHORTCUT_PATH + "/" + name + ".nslnk"
         
-        self.rename(snd_id, snd_magic, path, dest_name+".nslnk", version)
+        self.rename(path, dest_name+".nslnk")
         return jianguo_api.SUCCESS
 
     # 删除书签
     def delete_shortcut(self, name) -> int:
-        path = self.DEFAULT_SANDBOX_NAME + "/书签/" + name + ".nslnk"
-        version = self.get_file_info(path)[0]["rev"]
-        snd_id, snd_magic, path = self.path_cut(path)
-        
-        self.delete(snd_id, snd_magic, path, version)
+        path = self.DEFAULT_SHORTCUT_PATH + "/" + name + ".nslnk"
+        self.delete(path)
         return jianguo_api.SUCCESS
