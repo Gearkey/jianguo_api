@@ -197,8 +197,8 @@ class jianguo_api(object):
         if id == None: id = sandbox["id"] ### snd_id，str
         if magic == None: magic = sandbox["magic"] ### snd_magic，str
         if acl_signed == None: acl_signed = str(sandbox["acls"][0]["acl"]["signed"]) ### 未知，默认填充
-        if acl_users == None: acl_users = str(sandbox["acls"][0]["acl"]["users"])[1:-1] ### 用户
-        if acl_groups == None: acl_groups = str(sandbox["acls"][0]["acl"]["groups"])[1:-1] ### 用户组
+        if acl_users == None: acl_users = str(sandbox["acls"][0]["acl"]["users"])[1:-1] ### fixme：用户
+        if acl_groups == None: acl_groups = str(sandbox["acls"][0]["acl"]["groups"])[1:-1] ### fixme：用户组
 
         data = {
             "name": new_name,
@@ -332,6 +332,11 @@ class jianguo_api(object):
             
             if is_match: result.append(file)
         return result
+    
+    # 获取文件版本信息
+    def get_file_version(self, path, is_deleted=False):
+        if is_deleted: pass
+        else: return self.get_file_info(path)[0]["rev"]
 
     # 移动/复制文件
     # todo：实现路径到路径的操作，目前是路径到目标目录
@@ -464,3 +469,78 @@ class jianguo_api(object):
         path = self.DEFAULT_SHORTCUT_PATH + "/" + name + ".nslnk"
         self.delete(path)
         return jianguo_api.SUCCESS
+
+    # 创建/编辑分享
+    def share(self, path, acl_list=None, acl=None, disable_download=None, enable_upload=None, enable_watermark=None, enable_comment=None) -> dict:
+        ## 对于已存在的分享，默认使用已有信息，对于未存在的分享，使用初始值
+        try:
+            share_info = self.get_share_info(path)
+            version = str(share_info["version"])
+            if acl_list == None: acl_list = str(share_info["aclist"])
+            if acl == None: acl = str(share_info["acl"])
+            if disable_download == None: disable_download = str(share_info["downloadDisabled"])
+            if enable_upload == None: enable_upload = str(share_info["enableUpload"])
+            if enable_watermark == None: enable_watermark = str(share_info["enableWatermark"])
+            if enable_comment == None: enable_comment = str(share_info["aclist"])
+        except:
+            version = str(self.get_file_version(path))
+            if acl_list == None: acl_list = ""
+            if acl == None: acl = "1"
+            if disable_download == None: disable_download = "false"
+            if enable_upload == None: enable_upload = "false"
+            if enable_watermark == None: enable_watermark = "false"
+            if enable_comment == None: enable_comment = "false"
+
+        snd_id, snd_magic, path = self.path_cut(path)
+
+        data = {
+            "path": path,
+            "acl_list": acl_list,
+            "acl": acl,
+            "disable_download": disable_download,
+            "version": version,
+            "enable_upload": enable_upload,
+            "enable_watermark": enable_watermark,
+            "enable_comment": enable_comment,
+        }
+
+        resp = self._post(self._host_url + "/d/ajax/dirops/pub?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
+        return json.loads(resp)
+
+    # 移除分享
+    def delete_share(self, path) -> int:
+        ## 文件或文件夹需要区分一下
+        if self.get_share_list_info(path)["type"] == "directory": path += "|directory"
+        else: path += "|file"
+
+        snd_id, snd_magic, path = self.path_cut(path)
+
+        data = {
+            path: "dummy",
+        }
+
+        self._post(self._host_url + "/d/ajax/pubops/revoke?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
+        return jianguo_api.SUCCESS
+
+    # 获取分享信息
+    def get_share_info(self, path) -> dict:
+        snd_id, snd_magic, path = self.path_cut(path)
+        resp = self._get(self._host_url + "/d/ajax/pubInfo?path=" + path + "&sndId=" + snd_id + "&sndMagic=" + snd_magic)
+        return json.loads(resp)
+    
+    # 获取指定 path 的分享列表信息
+    def get_share_list_info(self, path) -> list:
+        snd_id, snd_magic, path = self.path_cut(path)
+
+        try:
+            resp = self._get(self._host_url + "/d/ajax/pubops/list/?sndId=" + snd_id + "&sndMagic=" + snd_magic)
+            shares = json.loads(resp)["objects"]
+        except:
+            pass
+
+        ## 如果 path 仅为 sandbox，则返回其下所有分享信息，否则返回单个分享的信息
+        if path == "":
+            return shares
+        else:
+            for share in shares:
+                if path == share["path"]: return share
