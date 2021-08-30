@@ -21,6 +21,7 @@ class jianguo_api(object):
     OFFICIAL_LIMITED = 11
     DEFAULT_SANDBOX_NAME = "我的坚果云"
     DEFAULT_SHORTCUT_PATH = DEFAULT_SANDBOX_NAME + "/书签"
+    MIX_EVENT_PAGE_NUM = 999
 
     def __init__(self):
         self._host_url = "https://www.jianguoyun.com"
@@ -544,3 +545,80 @@ class jianguo_api(object):
         else:
             for share in shares:
                 if path == share["path"]: return share
+
+    # 获取 sandbox 操作历史列表，可指定翻页标记 marker 和获取页数 page_num，以及通过属性筛选结果
+    def get_event(self, path, marker=0, page_num=1, snd_id="", snd_magic="", id=None, op_type=None, isdir=None, isdel=None, size=None, version=None, src_machine_name=None, editor_nick_name=None, editor_account=None, timestamp=None, is_virus=None, from_time=None, to_time=None) -> list:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
+        
+        ## 如果 marker 不为0，则添加 marker 翻页标记参数
+        url = self._host_url + "/d/ajax/getEvents?sndId=" + snd_id + "&sndMagic=" + snd_magic
+        if marker != 0: url = url + "&marker=" + str(marker)
+        
+        try:
+            resp = json.loads(self._get(url))
+            events = resp["events"]
+            marker = resp["marker"]
+        except:
+            pass
+
+        ## 根据输入条件筛选结果并返回（全部条件匹配）
+        result = []
+        for event in events:
+            is_match = True
+            
+            if (id != None) & (event["id"] != id): is_match = False ### id，操作唯一标识，str
+            if (op_type != None) & (event["opType"] != op_type): is_match = False ### 操作类型，添加为 ADD，删除为 DELETE，编辑为 EDIT，重命名为 RENAME，恢复为 RESTORE，str
+            if (path != "") & (event["path"] != path): is_match = False ### 文件路径，str
+            if (isdir != None) & (event["isdir"] != isdir): is_match = False ### 是否为目录，bool
+            if (isdel != None) & (event["isdel"] != isdel): is_match = False ### 是否已删除，bool
+            if (size != None) & (event["size"] != size): is_match = False ### 文件大小，单位 Byte，int
+            if (version != None) & (event["version"] != version): is_match = False ### 文件版本，str
+            if (src_machine_name != None) & (event["srcMachineName"] != src_machine_name): is_match = False ### 执行操作的机器名称，客户端为一个 UUID，网页端为 "WebConsole"，str
+            if (editor_nick_name != None) & (event["editorNickName"] != editor_nick_name): is_match = False ### 编辑者昵称，str
+            if (editor_account != None) & (event["editorAccount"] != editor_account): is_match = False ### 编辑者账号邮箱，str
+            if (timestamp != None) & (event["timestamp"] != timestamp): is_match = False ### 时间戳，int
+            if (is_virus != None) & (event["isVirus"] != is_virus): is_match = False ### toknow：是否为病毒，bool
+            if from_time != None:
+                if event["timestamp"] < from_time: is_match = False ### 起始时间
+            if to_time != None:
+                if event["timestamp"] >= to_time: is_match = False ### 终止时间
+            if is_match: result.append(event)
+
+        ## 如果页数为0，即需要找到能获取结果的第一页
+        if page_num == 0: page = -self.MIX_EVENT_PAGE_NUM
+        else: page = 1
+
+        ## 递归调用，并合并列表，目前每页100条信息
+        while page < page_num:
+            if marker == 1: break ### 如果 marker 为1，表示到达最终页，结束循环
+            if page_num == 0:
+                if result != []: break ### 如果 page_num 为0，且结果已不为空，结束循环
+            
+            page_result, marker = self.get_event(path, marker=marker, snd_id=snd_id, snd_magic=snd_magic, id=id, op_type=op_type, isdir=isdir, isdel=isdel, size=size, version=version, src_machine_name=src_machine_name, editor_nick_name=editor_nick_name, editor_account=editor_account, timestamp=timestamp, is_virus=is_virus, from_time=from_time, to_time=to_time)
+            result.extend(page_result)
+            page += 1
+
+            if page_result[-1]["timestamp"] < from_time: break ### 如果本页的最后一个项目的时间已小于 from_time，结束循环
+            
+        return result, marker
+
+    # 撤销操作历史
+    def undo_event(self, path, page_num=0, snd_id="", snd_magic="", id=None, op_type=None, isdir=None, isdel=None, size=None, version=None, src_machine_name=None, editor_nick_name=None, editor_account=None, timestamp=None, is_virus=None, from_time=None, to_time=None) -> int:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
+
+        events = self.get_event(path, page_num=page_num, snd_id=snd_id, snd_magic=snd_magic, id=id, op_type=op_type, isdir=isdir, isdel=isdel, size=size, version=version, src_machine_name=src_machine_name, editor_nick_name=editor_nick_name, editor_account=editor_account, timestamp=timestamp, is_virus=is_virus, from_time=from_time, to_time=to_time)[0]
+        for event in events:
+            data = {
+                "optype": event["opType"],
+                "path": event["path"],
+                "deleted": str(event["isdel"]),
+                "dir": event["isdir"],
+                "version": event["version"],
+            }
+
+            try:
+                resp = self._post(self._host_url + "/d/ajax/fileops/undoEvents?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
+            except:
+                pass
+
+        return jianguo_api.SUCCESS
