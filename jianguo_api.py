@@ -158,8 +158,8 @@ class jianguo_api(object):
         return json.loads(resp)
     
     # 删除同步文件夹
-    def delete_sandbox(self, name) -> int:
-        snd_id, snd_magic, path = self.path_cut(name)
+    def delete_sandbox(self, path, snd_id="", snd_magic="") -> int:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         self._post(self._host_url + "/d/ajax/sandbox/delete?sndId=" + snd_id + "&sndMagic=" + snd_magic, {})
         return jianguo_api.SUCCESS
@@ -170,15 +170,15 @@ class jianguo_api(object):
         return json.loads(file_list)["sandboxes"]
 
     # 从回收站恢复同步文件夹
-    def recovery_sandbox(self, name) -> int:
-        snd_id, snd_magic, path = self.path_cut(name, is_deleted=True)
+    def recovery_sandbox(self, path, snd_id="", snd_magic="") -> int:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path, is_deleted=True)
         
         self._post(self._host_url + "/d/ajax/sandbox/restore?sndId=" + snd_id + "&sndMagic=" + snd_magic, {})
         return jianguo_api.SUCCESS
     
     # 获取同步文件夹信息
-    def get_sandbox_info(self, name) -> dict:
-        snd_id, snd_magic, path = self.path_cut(name)
+    def get_sandbox_info(self, path, snd_id="", snd_magic="") -> dict:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         path = "/"
 
         sandbox_info = self._get(self._host_url + "/d/ajax/sandbox/metaData?path=" + path + "&sndId=" + snd_id + "&sndMagic=" + snd_magic)
@@ -217,8 +217,8 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
 
     # 新建文件
-    def creat_file(self, path, type="txt") -> int:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def creat_file(self, path, type="txt", snd_id="", snd_magic="") -> int:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         if type == "txt": content_uri = "/static/others/empty.txt"
         else: content_uri = "/static/others/empty.txt"
@@ -232,8 +232,8 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
     
     # 新建文件夹
-    def creat_dir(self, path) -> int:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def creat_dir(self, path, snd_id="", snd_magic="") -> int:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         data = {
             "path": path,
@@ -243,22 +243,22 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
 
     # todo：上传文件
-    def upload_file(self, path, name) -> dict:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def upload_file(self, path, name, snd_id="", snd_magic="") -> dict:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         dir_name = os.path.split(path)[1]
         resp = self._post(self._host_url + "/d/ajax/fileops/uploadXHRV2?path=" + path + "&dirName=" + dir_name + "&sndId=" + snd_id + "&sndMagic=" + snd_magic + "&name=" + name, {})
         return json.loads(resp)
 
     # todo：上传文件夹
-    def upload_dir(self, path) -> int:
+    def upload_dir(self, path, snd_id="", snd_magic="") -> int:
         self.creat_dir(path)
         return jianguo_api.SUCCESS
 
     # 删除项目
-    def delete(self, path, is_dir=False) -> int:
-        version = self.get_file_info(path)[0]["rev"]
-        snd_id, snd_magic, path = self.path_cut(path)
+    def delete(self, path, is_dir=False, snd_id="", snd_magic="") -> int:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
+        version = self.get_file_info(path, snd_id=snd_id, snd_magic=snd_magic)[0]["rev"]
         
         data = {
             path: version,
@@ -271,15 +271,16 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
 
     # 获取回收站文件列表
-    def get_rec_file_list(self, path) -> dict:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def get_rec_file_list(self, path, snd_id="", snd_magic="") -> dict:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
+        
         file_list = self._get(self._host_url + "/d/ajax/listTrashDir" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(file_list)
 
     # 彻底删除回收站项目
     # todo：建立获取回收站文件信息函数，自动获取文件版本
-    def delete_rec(self, path, version) -> int:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def delete_rec(self, path, version, snd_id="", snd_magic="") -> int:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         data = {
             path: version + " FILE",
@@ -289,8 +290,8 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
 
     # 从回收站恢复文件
-    def recovery(self, path) -> int:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def recovery(self, path, snd_id="", snd_magic="") -> int:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         data = {
             path: "",
@@ -303,19 +304,21 @@ class jianguo_api(object):
         else: return jianguo_api.FAILED
 
     # 获取文件列表
-    def get_file_list(self, path) -> dict:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def get_file_list(self, path, snd_id="", snd_magic="") -> dict:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         path = urllib.parse.quote(path)
 
         file_list = self._get(self._host_url + "/d/ajax/browse" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(file_list)
     
     # 通过条件获取文件信息
-    def get_file_info(self, path, name=None, rev=None, is_dir=None, is_deleted=None, mtime=None, size=None, tbl_uri=None, aux_info=None) -> list:
+    def get_file_info(self, path, name=None, rev=None, is_dir=None, is_deleted=None, mtime=None, size=None, tbl_uri=None, aux_info=None, snd_id="", snd_magic="") -> list:
         ## 如果只传入了 path，则精确定位 name
         if (name == None) & (name==None) & (rev==None) & (is_dir==None) & (is_deleted==None) & (mtime==None) & (size==None) & (tbl_uri==None) & (aux_info==None):
             path, name = os.path.split(path)
-        files = self.get_file_list(path)["contents"]
+        
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
+        files = self.get_file_list(path, snd_id=snd_id, snd_magic=snd_magic)["contents"]
 
         ## 根据输入条件筛选结果并返回（全部条件匹配）
         result = []
@@ -335,15 +338,16 @@ class jianguo_api(object):
         return result
     
     # 获取文件版本信息
-    def get_file_version(self, path, is_deleted=False):
+    def get_file_version(self, path, is_deleted=False, snd_id="", snd_magic=""):
         if is_deleted: pass
-        else: return self.get_file_info(path)[0]["rev"]
+        else: return self.get_file_info(path, snd_id=snd_id, snd_magic=snd_magic)[0]["rev"]
 
     # 移动/复制文件
     # todo：实现路径到路径的操作，目前是路径到目标目录
-    def move(self, src_path, dst_dir, is_copy=False) -> int:
-        snd_id, snd_magic, src_path = self.path_cut(src_path)
-        dst_snd_id, dst_snd_magic, dst_dir = self.path_cut(dst_dir)
+    # todo：如果没填目标路径则使用 src_path 信息的判断
+    def move(self, src_path, dst_dir, is_copy=False, snd_id="", snd_magic="", dst_snd_id="", dst_snd_magic="") -> int:
+        if snd_id == "": snd_id, snd_magic, src_path = self.path_cut(src_path)
+        if dst_snd_id == "": dst_snd_id, dst_snd_magic, dst_dir = self.path_cut(dst_dir)
         
         data = {
             "srcSndId": snd_id,
@@ -363,17 +367,17 @@ class jianguo_api(object):
         else: return jianguo_api.FAILED
     
     # 获取文件下载链接
-    def get_file_link(self, path) -> str:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def get_file_link(self, path, snd_id="", snd_magic="") -> str:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         path = urllib.parse.quote(path)
 
         resp = self._get(self._host_url + "/d/ajax/dlink?sndId=" + snd_id + "&sndMagic=" + snd_magic + "&path=" + path)
         return self._host_url + json.loads(resp)["url"]
 
     # 重命名文件
-    def rename(self, path, dest_name, is_dir=False) -> int:
-        version = self.get_file_info(path)[0]["rev"]
-        snd_id, snd_magic, path = self.path_cut(path)
+    def rename(self, path, dest_name, is_dir=False, snd_id="", snd_magic="") -> int:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
+        version = self.get_file_info(path, snd_id=snd_id, snd_magic=snd_magic)[0]["rev"]
         
         if is_dir: type = "directory"
         else: type = "file"
@@ -389,22 +393,22 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
     
     # 获取文件历史
-    def get_file_version_list(self, path) -> dict:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def get_file_version_list(self, path, snd_id="", snd_magic="") -> dict:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         version_list = self._get(self._host_url + "/d/ajax/versions" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(version_list)
 
     # 获取文件历史版本下载链接
-    def get_file_version_link(self, path, version) -> str:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def get_file_version_link(self, path, version, snd_id="", snd_magic="") -> str:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         resp = self._get(self._host_url + "/d/ajax/dlink?sndId=" + snd_id + "&sndMagic=" + snd_magic + "&path=" + path + "&ver=" + version)
         return self._host_url + json.loads(resp)["url"]
     
     # 恢复文件历史版本
-    def recovery_file_version(self, path, version) -> int:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def recovery_file_version(self, path, version, snd_id="", snd_magic="") -> int:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         data = {
             "path": path,
@@ -442,8 +446,8 @@ class jianguo_api(object):
         return self.get_file_list(self.DEFAULT_SHORTCUT_PATH)
 
     # 创建书签
-    def create_shortcut(self, path) -> dict:
-        snd_id, snd_magic, dest_path = self.path_cut(path)
+    def create_shortcut(self, path, snd_id="", snd_magic="") -> dict:
+        if snd_id == "": snd_id, snd_magic, dest_path = self.path_cut(path)
         
         data = {
             "destPath": dest_path,
@@ -472,10 +476,12 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
 
     # 创建/编辑分享
-    def share(self, path, acl_list=None, acl=None, disable_download=None, enable_upload=None, enable_watermark=None, enable_comment=None) -> dict:
+    def share(self, path, acl_list=None, acl=None, disable_download=None, enable_upload=None, enable_watermark=None, enable_comment=None, snd_id="", snd_magic="") -> dict:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
+        
         ## 对于已存在的分享，默认使用已有信息，对于未存在的分享，使用初始值
         try:
-            share_info = self.get_share_info(path)
+            share_info = self.get_share_info(path, snd_id=snd_id, snd_magic=snd_magic)
             version = str(share_info["version"])
             if acl_list == None: acl_list = str(share_info["aclist"])
             if acl == None: acl = str(share_info["acl"])
@@ -484,15 +490,13 @@ class jianguo_api(object):
             if enable_watermark == None: enable_watermark = str(share_info["enableWatermark"])
             if enable_comment == None: enable_comment = str(share_info["aclist"])
         except:
-            version = str(self.get_file_version(path))
+            version = str(self.get_file_version(path, snd_id=snd_id, snd_magic=snd_magic))
             if acl_list == None: acl_list = ""
             if acl == None: acl = "1"
             if disable_download == None: disable_download = "false"
             if enable_upload == None: enable_upload = "false"
             if enable_watermark == None: enable_watermark = "false"
             if enable_comment == None: enable_comment = "false"
-
-        snd_id, snd_magic, path = self.path_cut(path)
 
         data = {
             "path": path,
@@ -509,12 +513,12 @@ class jianguo_api(object):
         return json.loads(resp)
 
     # 移除分享
-    def delete_share(self, path) -> int:
+    def delete_share(self, path, snd_id="", snd_magic="") -> int:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
+        
         ## 文件或文件夹需要区分一下
-        if self.get_share_list_info(path)["type"] == "directory": path += "|directory"
+        if self.get_share_list_info(path, snd_id=snd_id, snd_magic=snd_magic)["type"] == "directory": path += "|directory"
         else: path += "|file"
-
-        snd_id, snd_magic, path = self.path_cut(path)
 
         data = {
             path: "dummy",
@@ -524,14 +528,14 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
 
     # 获取分享信息
-    def get_share_info(self, path) -> dict:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def get_share_info(self, path, snd_id="", snd_magic="") -> dict:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         resp = self._get(self._host_url + "/d/ajax/pubInfo?path=" + path + "&sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(resp)
     
     # 获取指定 path 的分享列表信息
-    def get_share_list_info(self, path) -> list:
-        snd_id, snd_magic, path = self.path_cut(path)
+    def get_share_list_info(self, path, snd_id="", snd_magic="") -> list:
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
 
         try:
             resp = self._get(self._host_url + "/d/ajax/pubops/list/?sndId=" + snd_id + "&sndMagic=" + snd_magic)
