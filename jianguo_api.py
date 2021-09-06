@@ -276,14 +276,37 @@ class jianguo_api(object):
         
         file_list = self._get(self._host_url + "/d/ajax/listTrashDir" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(file_list)
+    
+    # 获取回收站文件信息
+    def get_rec_file_info(self, path, name=None, version=None, isdir=None, isdel=None, timestamp=None, snd_id="", snd_magic="") -> list:
+        ## 如果只传入了 path，且没有其他筛选参数，则精确定位 name
+        if (name==None) & (version==None) & (isdir==None) & (isdel==None) & (timestamp==None):
+            path, name = os.path.split(path)
+        
+        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
+        files = self.get_rec_file_list(path, snd_id=snd_id, snd_magic=snd_magic)["contents"]
+
+        ## 根据输入条件筛选结果并返回（全部条件匹配）
+        result = []
+        for file in files:
+            is_match = True
+            
+            if (name != None) & (file["name"] != name): is_match = False
+            if (version != None) & (file["version"] != version): is_match = False
+            if (isdir != None) & (file["isdir"] != isdir): is_match = False
+            if (isdel != None) & (file["isdel"] != isdel): is_match = False
+            if (timestamp != None) & (file["timestamp"] != timestamp): is_match = False
+            
+            if is_match: result.append(file)
+        return result
 
     # 彻底删除回收站项目
-    # todo：建立获取回收站文件信息函数，自动获取文件版本
-    def delete_rec(self, path, version, snd_id="", snd_magic="") -> int:
+    def delete_rec(self, path, snd_id="", snd_magic="") -> int:
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
+        version = self.get_rec_file_info(path, snd_id=snd_id, snd_magic=snd_magic)[0]["version"]
         
         data = {
-            path: version + " FILE",
+            path: str(version) + " FILE",
         }
 
         self._post(self._host_url + "/d/ajax/purge?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
@@ -313,8 +336,8 @@ class jianguo_api(object):
     
     # 通过条件获取文件信息
     def get_file_info(self, path, name=None, rev=None, is_dir=None, is_deleted=None, mtime=None, size=None, tbl_uri=None, aux_info=None, snd_id="", snd_magic="") -> list:
-        ## 如果只传入了 path，则精确定位 name
-        if (name == None) & (name==None) & (rev==None) & (is_dir==None) & (is_deleted==None) & (mtime==None) & (size==None) & (tbl_uri==None) & (aux_info==None):
+        ## 如果只传入了 path，且没有其他筛选参数，则精确定位 name
+        if (name==None) & (rev==None) & (is_dir==None) & (is_deleted==None) & (mtime==None) & (size==None) & (tbl_uri==None) & (aux_info==None):
             path, name = os.path.split(path)
         
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
@@ -336,11 +359,6 @@ class jianguo_api(object):
             
             if is_match: result.append(file)
         return result
-    
-    # 获取文件版本信息
-    def get_file_version(self, path, is_deleted=False, snd_id="", snd_magic=""):
-        if is_deleted: pass
-        else: return self.get_file_info(path, snd_id=snd_id, snd_magic=snd_magic)[0]["rev"]
 
     # 移动/复制文件
     # todo：实现路径到路径的操作，目前是路径到目标目录
@@ -490,7 +508,7 @@ class jianguo_api(object):
             if enable_watermark == None: enable_watermark = str(share_info["enableWatermark"])
             if enable_comment == None: enable_comment = str(share_info["aclist"])
         except:
-            version = str(self.get_file_version(path, snd_id=snd_id, snd_magic=snd_magic))
+            version = str(self.get_file_info(path, snd_id=snd_id, snd_magic=snd_magic)[0]["rev"])
             if acl_list == None: acl_list = ""
             if acl == None: acl = "1"
             if disable_download == None: disable_download = "false"
