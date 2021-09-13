@@ -62,7 +62,7 @@ class jianguo_api(object):
         return json.loads(resp)
 
     # 根据某键内容获取单个或多个 sandbox 信息
-    def get_snd_info_by(self, name=None, snd_id=None, magic=None, owner=None, permission=None, caps=None, exclusive_user=None, is_default=None, is_owner=None, desc=None, used_space=None, is_deleted=False) -> list:
+    def get_snd_info_by(self, is_deleted=False, is_greedy=False, **kwargs) -> list:
         if is_deleted:
             sandboxes = self.get_sandbox_rec_list()
         else:
@@ -70,27 +70,8 @@ class jianguo_api(object):
             ### 获取用户信息中 sandbox 部分的内容，断点并且切割
             sandboxes_str = re.findall(r'"sandboxes":(.*?),"freeUpRate"', self.get_user_info())[0]
             sandboxes = json.loads(sandboxes_str)
-
-        ## 根据输入条件筛选结果并返回（全部条件匹配）
-        result = []
-        for sandbox in sandboxes:
-            is_match = True
-            
-            if (name != None) & (sandbox["name"] != name): is_match = False ### 名称，【我的坚果云】为空，str
-            if (snd_id != None) & (sandbox["sandboxId"] != snd_id): is_match = False ### id，str
-            if (magic != None) & (sandbox["magic"] != magic): is_match = False ### magic，str
-            if not is_deleted:
-                if (owner != None) & (sandbox["owner"] != owner): is_match = False ### 所有者，是邮件地址，str
-                if (permission != None) & (sandbox["permission"] != permission): is_match = False ### toknow：权限等级，int
-                if (caps != None) & (sandbox["caps"] != caps): is_match = False ### toknow：int
-                if (exclusive_user != None) & (sandbox["exclusiveUser"] != exclusive_user): is_match = False ### 是否用户专属，一般情况仅【我的坚果云】，bool
-                if (is_default != None) & (sandbox["isDefault"] != is_default): is_match = False ### toknow：是否默认位置，一般情况仅【我的坚果云】，bool
-                if (is_owner != None) & (sandbox["isOwner"] != is_owner): is_match = False ### 是否为所有者，bool
-                if (desc != None) & (sandbox["desc"] != desc): is_match = False ### 描述，默认为空，str
-                if (used_space != None) & (sandbox["usedSpace"] != used_space): is_match = False ### 已用空间，单位 Byte，int
-            
-            if is_match: result.append(sandbox)
-        return result
+        
+        return self.get_target_result(sandboxes, is_greedy, **kwargs)
 
     # 分解 path 为 snd_id、snd_magic 和 path
     def path_cut(self, path, is_deleted=False) -> tuple:
@@ -104,6 +85,26 @@ class jianguo_api(object):
 
         info = self.get_snd_info_by(name=sandbox_name, is_deleted=is_deleted)[0]
         return info["sandboxId"], info["magic"], path
+
+    # 获取指定字典列表的筛选结果（默认非贪婪匹配）
+    def get_target_result(self, items, is_greedy=False, **kwargs) -> list:
+        result = []
+        for item in items:
+            if is_greedy:
+                is_match = False
+                for key, value in kwargs.items():
+                    if item[key] == value:
+                        is_match = True
+                        break
+            else:
+                is_match = True
+                for key, value in kwargs.items():
+                    if item[key] != value:
+                        is_match = False
+                        break
+            
+            if is_match: result.append(item)
+        return result
     
     # 获取用户 Cookie
     def get_cookie(self) -> dict:
@@ -185,32 +186,25 @@ class jianguo_api(object):
         return json.loads(sandbox_info)
     
     # 修改同步文件夹信息
-    def update_sandbox_info(self, name, new_name=None, do_not_sync=None, desc=None, acl_path=None, id=None, magic=None, acl_signed=None, acl_users=None, acl_groups=None) -> int:
-        sandbox = self.get_sandbox_info(name)
+    def update_sandbox_info(self, original_name, **kwargs) -> int:
+        sandbox = self.get_sandbox_info(original_name)
         if sandbox["acls"] == []:
             sandbox["acls"] = [{"acl": {"anonymous": 0, "signed": 0, "users": {}, "userNicks": {}, "groups": []}, "path": "/"}]
 
         ## 如果某项为空，填充为已有或默认值
-        if new_name == None: new_name = name ### sandbox 名称，str
-        if do_not_sync == None: do_not_sync = sandbox["doNotSync"] ### 是否同步，str
-        if desc == None: desc = sandbox["desc"] ### 描述，str
-        if acl_path == None: acl_path = sandbox["acls"][0]["path"] ### fixme：权限位置，str
-        if id == None: id = sandbox["id"] ### snd_id，str
-        if magic == None: magic = sandbox["magic"] ### snd_magic，str
-        if acl_signed == None: acl_signed = str(sandbox["acls"][0]["acl"]["signed"]) ### 未知，默认填充
-        if acl_users == None: acl_users = str(sandbox["acls"][0]["acl"]["users"])[1:-1] ### fixme：用户
-        if acl_groups == None: acl_groups = str(sandbox["acls"][0]["acl"]["groups"])[1:-1] ### fixme：用户组
+        for key, value in kwargs.items():
+            sandbox[key] = value
 
         data = {
-            "name": new_name,
-            "do_not_sync": do_not_sync,
-            "desc": desc,
-            "acl_path": acl_path,
-            "id": id,
-            "magic": magic,
-            "acl_signed": acl_signed,
-            "acl_users": acl_users,
-            "acl_groups": acl_groups,
+            "name": sandbox["name"],
+            "do_not_sync": sandbox["doNotSync"],
+            "desc": sandbox["desc"],
+            "acl_path": sandbox["acls"][0]["path"],
+            "id": sandbox["id"],
+            "magic": sandbox["magic"],
+            "acl_signed": str(sandbox["acls"][0]["acl"]["signed"]),
+            "acl_users": str(sandbox["acls"][0]["acl"]["users"])[1:-1],
+            "acl_groups": str(sandbox["acls"][0]["acl"]["groups"])[1:-1],
         }
 
         self._post(self._host_url + "/d/ajax/sandbox/updateMetaData?sndId=" + sandbox["id"] + "&sndMagic=" + sandbox["magic"], data)
@@ -270,36 +264,6 @@ class jianguo_api(object):
         self._post(self._host_url + delete_path + snd_id + "&sndMagic=" + snd_magic, data)
         return jianguo_api.SUCCESS
 
-    # 获取回收站文件列表
-    def get_rec_file_list(self, path, snd_id="", snd_magic="") -> dict:
-        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
-        
-        file_list = self._get(self._host_url + "/d/ajax/listTrashDir" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
-        return json.loads(file_list)
-    
-    # 获取回收站文件信息
-    def get_rec_file_info(self, path, name=None, version=None, isdir=None, isdel=None, timestamp=None, snd_id="", snd_magic="") -> list:
-        ## 如果只传入了 path，且没有其他筛选参数，则精确定位 name
-        if (name==None) & (version==None) & (isdir==None) & (isdel==None) & (timestamp==None):
-            path, name = os.path.split(path)
-        
-        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
-        files = self.get_rec_file_list(path, snd_id=snd_id, snd_magic=snd_magic)["contents"]
-
-        ## 根据输入条件筛选结果并返回（全部条件匹配）
-        result = []
-        for file in files:
-            is_match = True
-            
-            if (name != None) & (file["name"] != name): is_match = False
-            if (version != None) & (file["version"] != version): is_match = False
-            if (isdir != None) & (file["isdir"] != isdir): is_match = False
-            if (isdel != None) & (file["isdel"] != isdel): is_match = False
-            if (timestamp != None) & (file["timestamp"] != timestamp): is_match = False
-            
-            if is_match: result.append(file)
-        return result
-
     # 彻底删除回收站项目
     def delete_rec(self, path, snd_id="", snd_magic="") -> int:
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
@@ -327,38 +291,26 @@ class jianguo_api(object):
         else: return jianguo_api.FAILED
 
     # 获取文件列表
-    def get_file_list(self, path, snd_id="", snd_magic="") -> dict:
+    def get_file_list(self, path, snd_id="", snd_magic="", is_deleted=False) -> dict:
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         path = urllib.parse.quote(path)
 
-        file_list = self._get(self._host_url + "/d/ajax/browse" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
+        if is_deleted:
+            file_list = self._get(self._host_url + "/d/ajax/listTrashDir" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
+        else:
+            file_list = self._get(self._host_url + "/d/ajax/browse" + path + "?sndId=" + snd_id + "&sndMagic=" + snd_magic)
         return json.loads(file_list)
     
     # 通过条件获取文件信息
-    def get_file_info(self, path, name=None, rev=None, is_dir=None, is_deleted=None, mtime=None, size=None, tbl_uri=None, aux_info=None, snd_id="", snd_magic="") -> list:
+    def get_file_info(self, path, snd_id="", snd_magic="", is_deleted=False, is_greedy=False, **kwargs) -> list:
         ## 如果只传入了 path，且没有其他筛选参数，则精确定位 name
-        if (name==None) & (rev==None) & (is_dir==None) & (is_deleted==None) & (mtime==None) & (size==None) & (tbl_uri==None) & (aux_info==None):
-            path, name = os.path.split(path)
+        if not kwargs:
+            path, kwargs["name"] = os.path.split(path)
         
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
-        files = self.get_file_list(path, snd_id=snd_id, snd_magic=snd_magic)["contents"]
-
-        ## 根据输入条件筛选结果并返回（全部条件匹配）
-        result = []
-        for file in files:
-            is_match = True
-            
-            if (name != None) & (file["name"] != name): is_match = False
-            if (rev != None) & (file["rev"] != rev): is_match = False
-            if (is_dir != None) & (file["isDir"] != is_dir): is_match = False
-            if (is_deleted != None) & (file["isDeleted"] != is_deleted): is_match = False
-            if (mtime != None) & (file["mtime"] != mtime): is_match = False
-            if (size != None) & (file["size"] != size): is_match = False
-            if (tbl_uri != None) & (file["tblUri"] != tbl_uri): is_match = False
-            if (aux_info != None) & (file["auxInfo"] != aux_info): is_match = False
-            
-            if is_match: result.append(file)
-        return result
+        files = self.get_file_list(path, snd_id, snd_magic, is_deleted)["contents"]
+        
+        return self.get_target_result(files, is_greedy, **kwargs)
 
     # 移动/复制文件
     # todo：实现路径到路径的操作，目前是路径到目标目录
@@ -494,37 +446,33 @@ class jianguo_api(object):
         return jianguo_api.SUCCESS
 
     # 创建/编辑分享
-    def share(self, path, acl_list=None, acl=None, disable_download=None, enable_upload=None, enable_watermark=None, enable_comment=None, snd_id="", snd_magic="") -> dict:
+    def share(self, path, snd_id="", snd_magic="", **kwargs) -> dict:
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         ## 对于已存在的分享，默认使用已有信息，对于未存在的分享，使用初始值
         try:
             share_info = self.get_share_info(path, snd_id=snd_id, snd_magic=snd_magic)
-            version = str(share_info["version"])
-            if acl_list == None: acl_list = str(share_info["aclist"])
-            if acl == None: acl = str(share_info["acl"])
-            if disable_download == None: disable_download = str(share_info["downloadDisabled"])
-            if enable_upload == None: enable_upload = str(share_info["enableUpload"])
-            if enable_watermark == None: enable_watermark = str(share_info["enableWatermark"])
-            if enable_comment == None: enable_comment = str(share_info["aclist"])
+            for key, value in kwargs.items():
+                share_info[key] = value
         except:
-            version = str(self.get_file_info(path, snd_id=snd_id, snd_magic=snd_magic)[0]["rev"])
-            if acl_list == None: acl_list = ""
-            if acl == None: acl = "1"
-            if disable_download == None: disable_download = "false"
-            if enable_upload == None: enable_upload = "false"
-            if enable_watermark == None: enable_watermark = "false"
-            if enable_comment == None: enable_comment = "false"
-
+            share_info = {
+                "aclist": "",
+                "acl": 1,
+                "downloadDisabled": False,
+                "version": 1,
+                "enableUpload": False,
+                "enableWatermark": False,
+            }
+        
         data = {
             "path": path,
-            "acl_list": acl_list,
-            "acl": acl,
-            "disable_download": disable_download,
-            "version": version,
-            "enable_upload": enable_upload,
-            "enable_watermark": enable_watermark,
-            "enable_comment": enable_comment,
+            "acl_list": share_info["aclist"],
+            "acl": share_info["acl"],
+            "disable_download": share_info["downloadDisabled"],
+            "version": share_info["version"],
+            "enable_upload": share_info["enableUpload"],
+            "enable_watermark": share_info["enableWatermark"],
+            "enable_comment": False,
         }
 
         resp = self._post(self._host_url + "/d/ajax/dirops/pub?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
@@ -569,10 +517,14 @@ class jianguo_api(object):
                 if path == share["path"]: return share
 
     # 获取 sandbox 操作历史列表，可指定翻页标记 marker 和获取页数 page_num，以及通过属性筛选结果
-    def get_event(self, path, marker=0, page_num=1, snd_id="", snd_magic="", id=None, op_type=None, isdir=None, isdel=None, size=None, version=None, src_machine_name=None, editor_nick_name=None, editor_account=None, timestamp=None, is_virus=None, from_time=None, to_time=None) -> list:
-        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
+    def get_event(self, original_path, marker=0, page_num=1, snd_id="", snd_magic="", from_time=None, to_time=None, is_greedy=False, **kwargs) -> list:
+        if snd_id == "": snd_id, snd_magic, original_path = self.path_cut(original_path)
+        print(snd_magic)
+        if original_path != "":
+            if not kwargs: kwargs["path"] = original_path ## fixme：判断条件有问题，包括 get_file_info
         
         ## 如果 marker 不为0，则添加 marker 翻页标记参数
+        # print(type(snd_id), type(snd_magic))
         url = self._host_url + "/d/ajax/getEvents?sndId=" + snd_id + "&sndMagic=" + snd_magic
         if marker != 0: url = url + "&marker=" + str(marker)
         
@@ -583,23 +535,13 @@ class jianguo_api(object):
         except:
             pass
 
-        ## 根据输入条件筛选结果并返回（全部条件匹配）
+        events = self.get_target_result(events, is_greedy, **kwargs)
+
+        ## 时间筛选
         result = []
         for event in events:
             is_match = True
-            
-            if (id != None) & (event["id"] != id): is_match = False ### id，操作唯一标识，str
-            if (op_type != None) & (event["opType"] != op_type): is_match = False ### 操作类型，添加为 ADD，删除为 DELETE，编辑为 EDIT，重命名为 RENAME，恢复为 RESTORE，str
-            if (path != "") & (event["path"] != path): is_match = False ### 文件路径，str
-            if (isdir != None) & (event["isdir"] != isdir): is_match = False ### 是否为目录，bool
-            if (isdel != None) & (event["isdel"] != isdel): is_match = False ### 是否已删除，bool
-            if (size != None) & (event["size"] != size): is_match = False ### 文件大小，单位 Byte，int
-            if (version != None) & (event["version"] != version): is_match = False ### 文件版本，str
-            if (src_machine_name != None) & (event["srcMachineName"] != src_machine_name): is_match = False ### 执行操作的机器名称，客户端为一个 UUID，网页端为 "WebConsole"，str
-            if (editor_nick_name != None) & (event["editorNickName"] != editor_nick_name): is_match = False ### 编辑者昵称，str
-            if (editor_account != None) & (event["editorAccount"] != editor_account): is_match = False ### 编辑者账号邮箱，str
-            if (timestamp != None) & (event["timestamp"] != timestamp): is_match = False ### 时间戳，int
-            if (is_virus != None) & (event["isVirus"] != is_virus): is_match = False ### toknow：是否为病毒，bool
+
             if from_time != None:
                 if event["timestamp"] < from_time: is_match = False ### 起始时间
             if to_time != None:
@@ -616,19 +558,19 @@ class jianguo_api(object):
             if page_num == 0:
                 if result != []: break ### 如果 page_num 为0，且结果已不为空，结束循环
             
-            page_result, marker = self.get_event(path, marker=marker, snd_id=snd_id, snd_magic=snd_magic, id=id, op_type=op_type, isdir=isdir, isdel=isdel, size=size, version=version, src_machine_name=src_machine_name, editor_nick_name=editor_nick_name, editor_account=editor_account, timestamp=timestamp, is_virus=is_virus, from_time=from_time, to_time=to_time)
+            page_result, marker = self.get_event(original_path, marker, page_num, snd_id, snd_magic, from_time, to_time, is_greedy, **kwargs)
             result.extend(page_result)
             page += 1
 
-            if page_result[-1]["timestamp"] < from_time: break ### 如果本页的最后一个项目的时间已小于 from_time，结束循环
+            # if page_result[-1]["timestamp"] < from_time: break ### 如果本页的最后一个项目的时间已小于 from_time，结束循环
             
         return result, marker
 
     # 撤销操作历史
-    def undo_event(self, path, page_num=0, snd_id="", snd_magic="", id=None, op_type=None, isdir=None, isdel=None, size=None, version=None, src_machine_name=None, editor_nick_name=None, editor_account=None, timestamp=None, is_virus=None, from_time=None, to_time=None) -> int:
+    def undo_event(self, path, snd_id="", snd_magic="", **kwargs) -> int:
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
 
-        events = self.get_event(path, page_num=page_num, snd_id=snd_id, snd_magic=snd_magic, id=id, op_type=op_type, isdir=isdir, isdel=isdel, size=size, version=version, src_machine_name=src_machine_name, editor_nick_name=editor_nick_name, editor_account=editor_account, timestamp=timestamp, is_virus=is_virus, from_time=from_time, to_time=to_time)[0]
+        events = self.get_event(path, snd_id=snd_id, snd_magic=snd_magic, **kwargs)[0]
         for event in events:
             data = {
                 "optype": event["opType"],
