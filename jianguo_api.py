@@ -5,7 +5,7 @@ import urllib.request
 import urllib.parse
 from datetime import datetime
 
-class jianguo_api(object):
+class Jianguo(object):
     FAILED = -1
     SUCCESS = 0
     ID_ERROR = 1
@@ -51,9 +51,9 @@ class jianguo_api(object):
     # 设置单文件大小限制（网页版限制500M）
     def set_max_size(self, max_size=500) -> int:
         if max_size < 500:
-            return jianguo_api.FAILED
+            return Jianguo.FAILED
         self._max_size = max_size
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
 
     # 获取账户基本信息
     def get_user_info(self) -> dict:
@@ -116,27 +116,13 @@ class jianguo_api(object):
         self._headers['cookie'] = self._cookies
         self._uesr_info = json.loads(self.get_user_info())
 
-        return jianguo_api.SUCCESS
-
-    # todo：账号密码登录
-    def login(self, email, password) -> int:
-        data = {
-            "login_email": email,
-            "login_password": password,
-            "remember_me": "on",
-            "login_dest_uri": "/d/home",
-            "custom_ticket": "",
-            "sig": "",
-            "reusable": "false",
-        }
-        self._post(self._host_url + "/d/login", data)
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
 
     # 注销
     def logout(self) -> int:
         self._get(self._host_url + "/logout")
         self._cookies = None
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
 
     # 通过 uuid 判断操作是否成功
     def is_success_by_uuid(self, path, uuid) -> bool:
@@ -163,7 +149,7 @@ class jianguo_api(object):
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         self._post(self._host_url + "/d/ajax/sandbox/delete?sndId=" + snd_id + "&sndMagic=" + snd_magic, {})
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
     
     # 获取同步文件夹回收站列表
     def get_sandbox_rec_list(self) -> dict:
@@ -175,7 +161,7 @@ class jianguo_api(object):
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path, is_deleted=True)
         
         self._post(self._host_url + "/d/ajax/sandbox/restore?sndId=" + snd_id + "&sndMagic=" + snd_magic, {})
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
     
     # 获取同步文件夹信息
     def get_sandbox_info(self, path, snd_id="", snd_magic="") -> dict:
@@ -208,7 +194,7 @@ class jianguo_api(object):
         }
 
         self._post(self._host_url + "/d/ajax/sandbox/updateMetaData?sndId=" + sandbox["id"] + "&sndMagic=" + sandbox["magic"], data)
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
 
     # 新建文件
     def creat_file(self, path, type="txt", snd_id="", snd_magic="") -> int:
@@ -223,7 +209,7 @@ class jianguo_api(object):
         }
 
         self._post(self._host_url + "/d/ajax/fileops/create?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
     
     # 新建文件夹
     def creat_dir(self, path, snd_id="", snd_magic="") -> int:
@@ -234,20 +220,7 @@ class jianguo_api(object):
         }
 
         self._post(self._host_url + "/d/ajax/dirops/create?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
-        return jianguo_api.SUCCESS
-
-    # todo：上传文件
-    def upload_file(self, path, name, snd_id="", snd_magic="") -> dict:
-        if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
-        
-        dir_name = os.path.split(path)[1]
-        resp = self._post(self._host_url + "/d/ajax/fileops/uploadXHRV2?path=" + path + "&dirName=" + dir_name + "&sndId=" + snd_id + "&sndMagic=" + snd_magic + "&name=" + name, {})
-        return json.loads(resp)
-
-    # todo：上传文件夹
-    def upload_dir(self, path, snd_id="", snd_magic="") -> int:
-        self.creat_dir(path)
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
 
     # 删除项目
     def delete(self, path, is_dir=False, snd_id="", snd_magic="") -> int:
@@ -262,7 +235,7 @@ class jianguo_api(object):
         else: delete_path = "/d/ajax/fileops/delete?sndId="
 
         self._post(self._host_url + delete_path + snd_id + "&sndMagic=" + snd_magic, data)
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
 
     # 彻底删除回收站项目
     def delete_rec(self, path, snd_id="", snd_magic="") -> int:
@@ -274,7 +247,7 @@ class jianguo_api(object):
         }
 
         self._post(self._host_url + "/d/ajax/purge?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
 
     # 从回收站恢复文件
     def recovery(self, path, snd_id="", snd_magic="") -> int:
@@ -287,8 +260,8 @@ class jianguo_api(object):
         ## 恢复后返回一个操作的 uuid，通过 uuid 判断操作是否成功
         uuid = self._post(self._host_url + "/d/ajax/restoreDel?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
 
-        if self.is_success_by_uuid("/d/ajax/restoreProgress?uuid=", uuid): return jianguo_api.SUCCESS
-        else: return jianguo_api.FAILED
+        if self.is_success_by_uuid("/d/ajax/restoreProgress?uuid=", uuid): return Jianguo.SUCCESS
+        else: return Jianguo.FAILED
 
     # 获取文件列表
     def get_file_list(self, path, snd_id="", snd_magic="", is_deleted=False) -> dict:
@@ -333,8 +306,8 @@ class jianguo_api(object):
         ## 移动后返回一个操作的 uuid，通过 uuid 判断操作是否成功
         uuid = self._post(self._host_url + move_path + dst_snd_id + "&sndMagic=" + dst_snd_magic, data)
 
-        if self.is_success_by_uuid("/d/ajax/moveProgress?uuid=", uuid): return jianguo_api.SUCCESS
-        else: return jianguo_api.FAILED
+        if self.is_success_by_uuid("/d/ajax/moveProgress?uuid=", uuid): return Jianguo.SUCCESS
+        else: return Jianguo.FAILED
     
     # 获取文件下载链接
     def get_file_link(self, path, snd_id="", snd_magic="") -> str:
@@ -360,7 +333,7 @@ class jianguo_api(object):
         }
 
         self._post(self._host_url + "/d/ajax/rename?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
     
     # 获取文件历史
     def get_file_version_list(self, path, snd_id="", snd_magic="") -> dict:
@@ -386,7 +359,7 @@ class jianguo_api(object):
         }
 
         self._post(self._host_url + "/d/ajax/fileops/restore?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
     
     # 获取应用密码
     def get_asps(self) -> dict:
@@ -409,7 +382,7 @@ class jianguo_api(object):
         }
 
         self._post(self._host_url + "/d/ajax/userop/revokeAsp", data)
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
 
     # 获取书签列表
     def get_shortcut_list(self) -> dict:
@@ -437,13 +410,13 @@ class jianguo_api(object):
         path = self.DEFAULT_SHORTCUT_PATH + "/" + name + ".nslnk"
         
         self.rename(path, dest_name+".nslnk")
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
 
     # 删除书签
     def delete_shortcut(self, name) -> int:
         path = self.DEFAULT_SHORTCUT_PATH + "/" + name + ".nslnk"
         self.delete(path)
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
 
     # 创建/编辑分享
     def share(self, path, snd_id="", snd_magic="", **kwargs) -> dict:
@@ -491,7 +464,7 @@ class jianguo_api(object):
         }
 
         self._post(self._host_url + "/d/ajax/pubops/revoke?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
 
     # 获取分享信息
     def get_share_info(self, path, snd_id="", snd_magic="") -> dict:
@@ -585,4 +558,4 @@ class jianguo_api(object):
             except:
                 pass
 
-        return jianguo_api.SUCCESS
+        return Jianguo.SUCCESS
