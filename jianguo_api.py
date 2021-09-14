@@ -132,13 +132,13 @@ class Jianguo(object):
         else: return False
     
     # 新建同步文件夹
-    def creat_sandbox(self, name, acl_anonymous="0", acl_signed="0", desc="", do_not_sync="false") -> dict:
+    def creat_sandbox(self, name, **kwargs) -> dict:
         data = {
-            "acl_anonymous": acl_anonymous, ### to_know：是否匿名
-            "acl_signed": acl_signed, ### to_know：是否签名
-            "desc": desc, ### 同步文件夹描述
-            "do_not_sync": do_not_sync, ### 是否不同步到本地
-            "name": name, ### 同步文件夹名称
+            "acl_anonymous": kwargs.get("acl_anonymous", "0"),
+            "acl_signed": kwargs.get("acl_signed", "0"),
+            "desc": kwargs.get("desc", ""),
+            "do_not_sync": kwargs.get("do_not_sync", "true"),
+            "name": name,
         }
 
         resp = self._post(self._host_url + "/d/ajax/sandbox/create", data)
@@ -197,7 +197,7 @@ class Jianguo(object):
         return Jianguo.SUCCESS
 
     # 新建文件
-    def creat_file(self, path, type="txt", snd_id="", snd_magic="") -> int:
+    def creat_file(self, path, snd_id="", snd_magic="", type="txt") -> int:
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         
         if type == "txt": content_uri = "/static/others/empty.txt"
@@ -223,15 +223,15 @@ class Jianguo(object):
         return Jianguo.SUCCESS
 
     # 删除项目
-    def delete(self, path, is_dir=False, snd_id="", snd_magic="") -> int:
+    def delete(self, path, snd_id="", snd_magic="") -> int:
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
-        version = self.get_file_info(path, snd_id=snd_id, snd_magic=snd_magic)[0]["rev"]
+        file = self.get_file_info(path, snd_id, snd_magic)[0]
         
         data = {
-            path: version,
+            path: file["rev"],
         }
 
-        if is_dir: delete_path = "/d/ajax/dirops/delete?sndId="
+        if file["isDir"]: delete_path = "/d/ajax/dirops/delete?sndId="
         else: delete_path = "/d/ajax/fileops/delete?sndId="
 
         self._post(self._host_url + delete_path + snd_id + "&sndMagic=" + snd_magic, data)
@@ -277,8 +277,8 @@ class Jianguo(object):
     # 通过条件获取文件信息
     def get_file_info(self, path, snd_id="", snd_magic="", is_deleted=False, is_greedy=False, **kwargs) -> list:
         ## 如果只传入了 path，且没有其他筛选参数，则精确定位 name
-        if not kwargs:
-            path, kwargs["name"] = os.path.split(path)
+        path, name = os.path.split(path)
+        kwargs["name"] = kwargs.get("name", name)
         
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
         files = self.get_file_list(path, snd_id, snd_magic, is_deleted)["contents"]
@@ -318,18 +318,18 @@ class Jianguo(object):
         return self._host_url + json.loads(resp)["url"]
 
     # 重命名文件
-    def rename(self, path, dest_name, is_dir=False, snd_id="", snd_magic="") -> int:
+    def rename(self, path, dest_name, snd_id="", snd_magic="") -> int:
         if snd_id == "": snd_id, snd_magic, path = self.path_cut(path)
-        version = self.get_file_info(path, snd_id=snd_id, snd_magic=snd_magic)[0]["rev"]
+        file = self.get_file_info(path, snd_id, snd_magic)[0]
         
-        if is_dir: type = "directory"
+        if file["isDir"]: type = "directory"
         else: type = "file"
         
         data = {
             "path": path,
             "type": type,
             "destName": dest_name,
-            "version": version,
+            "version": file["rev"],
         }
 
         self._post(self._host_url + "/d/ajax/rename?sndId=" + snd_id + "&sndMagic=" + snd_magic, data)
@@ -424,27 +424,20 @@ class Jianguo(object):
         
         ## 对于已存在的分享，默认使用已有信息，对于未存在的分享，使用初始值
         try:
-            share_info = self.get_share_info(path, snd_id=snd_id, snd_magic=snd_magic)
+            share_info = self.get_share_info(path, snd_id, snd_magic)
             for key, value in kwargs.items():
                 share_info[key] = value
         except:
-            share_info = {
-                "aclist": "",
-                "acl": 1,
-                "downloadDisabled": False,
-                "version": 1,
-                "enableUpload": False,
-                "enableWatermark": False,
-            }
+            pass
         
         data = {
             "path": path,
-            "acl_list": share_info["aclist"],
-            "acl": share_info["acl"],
-            "disable_download": share_info["downloadDisabled"],
-            "version": share_info["version"],
-            "enable_upload": share_info["enableUpload"],
-            "enable_watermark": share_info["enableWatermark"],
+            "acl_list": share_info.get("aclist", ""),
+            "acl": share_info.get("acl", 1),
+            "disable_download": share_info.get("downloadDisabled", False),
+            "version": share_info.get("version", 1),
+            "enable_upload": share_info.get("enableUpload", False),
+            "enable_watermark": share_info.get("enableWatermark", False),
             "enable_comment": False,
         }
 
@@ -492,9 +485,7 @@ class Jianguo(object):
     # 获取 sandbox 操作历史列表，可指定翻页标记 marker 和获取页数 page_num，以及通过属性筛选结果
     def get_event(self, original_path, marker=0, page_num=1, snd_id="", snd_magic="", from_time=None, to_time=None, is_greedy=False, **kwargs) -> list:
         if snd_id == "": snd_id, snd_magic, original_path = self.path_cut(original_path)
-        print(snd_magic)
-        if original_path != "":
-            if not kwargs: kwargs["path"] = original_path ## fixme：判断条件有问题，包括 get_file_info
+        kwargs["path"] = kwargs.get("path", original_path)
         
         ## 如果 marker 不为0，则添加 marker 翻页标记参数
         # print(type(snd_id), type(snd_magic))
